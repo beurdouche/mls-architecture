@@ -293,13 +293,16 @@ Upon joining the system, each Client stores its initial cryptographic
 key material with the DS. This key material represents the initial contribution
 from each member that will be used in the establishment of the shared group
 key. This initial keying material MUST be authenticated using
-the Client's identity key. Thus, the Client stores:
+the Client's long-term identity key. Thus, the Client stores:
 
 * A credential from the Authentication service attesting to the
   binding between the Member and the Client's identity key.
 
 * The member's initial keying material signed with the Client's
   identity key.
+
+* The member's initial ephemeral public signature key signed with
+  the Client's identity key.
 
 As noted above, Members may have multiple Clients, each with their
 own keying material, and thus there may be multiple entries stored
@@ -309,7 +312,7 @@ by each Member.
 
 When a Client wishes to establish a group and send an initial message
 to that group, it contacts the DS and retrieves the initial key
-material for each other Member, verifies it using the identity key,
+material for each other Member, verifies it using the public identity key,
 and then is able to form a joint key with each other Client, and
 from those forms the group key, which it can use for the encryption of
 messages.
@@ -480,10 +483,10 @@ accept a message if it was sent by a group member and that one Client
 must not be able to send a message which other Clients accept
 as being from another Client.
 
-A corollary to this statement is that the AS
-and the DS can't read the content of messages sent between Members as
-they are not Members of the Group. MLS is expected to
-optionally provide additional protections regarding traffic analysis so as to reduce the ability of adversaries, or a compromised
+A corollary to this statement is that the AS and the DS can't read
+the content of messages sent between Members as they are not Members
+of the Group. MLS is expected to optionally provide additional protections
+regarding traffic analysis so as to reduce the ability of adversaries, or a compromised
 member of the messaging system, to deduce the content of the messages
 depending on (for example) their size. One of these protections includes
 padding messages in order to produce ciphertexts of standard
@@ -491,8 +494,22 @@ length. While this protection is highly recommended it is not
 mandatory as it can be costly in terms of performance for clients
 and the MS.
 
+Message authentication in MLS is done by deriving ephemeral signature key
+pairs on a per message or per period basis. There are multiple benefit of
+not signing messages using the long term-identity key but with ephemeral
+keys. Typically it avoids having to share this key across devices. Additionnally
+it provides forward secrecy and post-compromise security properties in case
+where some signature private key were to be compromised. This key rolling policy
+is left to the application to decide. Conversely to updating group encryption keys
+deriving new signature keys is very efficient as the next public signature key
+can be sent to other Clients with the current outgoing message.
+Deriving new ephemeral signature key pairs must be done by using the MLS key
+derivation algorithm over the current transcript and ephemeral signature public
+key instead of deriving new keys that could be insecure for many reason such
+as entropy exhaustion on the device.
 Message content can be deniable if the signature keys are exchanged over
-a deniable channel prior to signing messages.
+a deniable channel prior to signing messages or are derived from such a key
+independently from the long-term identity signature key.
 
 #### Forward and Post-Compromise Security {#fs-and-pcs}
 
@@ -572,8 +589,18 @@ by mechanisms which allow the receiver to prove a message's origin
 to a third party (this if often called "non-repudiation"), but it
 should also be possible to operate MLS in a "deniable" mode where such
 proof is not possible.
-[[OPEN ISSUE: Exactly how to supply this is still a protocol question.]]
-
+Signing messages for authentication and providing deniability are not necessary
+in contradiction. The intuition behind this fact is that an adversary that is
+already a member of the group and has access to the plain signed message should
+not able to relate the ephemerally signed message (the public key) with a long
+term identity key, the authentication must remain implicit.
+While this document does not enforce a specific way to acheive deniability of
+messages one could acheive this by sending to each member of the group an initial
+ephemeral signature public key by creating a one-to-one deniable channel with each
+member. There is an implicit authentication over the public key in question, as it
+is not signed with the long-term identity key, that can be used to "authenticate"
+the sender of a message to the group.
+[[ TODO: Make sure we have a cryptographic security proof for this.]]
 
 # Security Considerations
 
